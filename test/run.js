@@ -52,6 +52,8 @@ const EXPECTED = [
     title: "Wielki film przyrodniczy",
     extension: "mp4",
     isStream: false,
+    resolution: "1080p",
+    resolutionSource: "address",
   },
   {
     what: 'a row of nothing but "5" and "1920 x 1080" is not a title either',
@@ -59,6 +61,9 @@ const EXPECTED = [
     title: "Big Buck Bunny 1080 10s 5MB",
     extension: "mp4",
     isStream: false,
+    // The same row text that is rejected as a title is where the resolution comes from.
+    resolution: "1080p",
+    resolutionSource: "page",
   },
   {
     what: '"Pobierz" with no context falls back to the file name, not the page <h1>',
@@ -66,6 +71,24 @@ const EXPECTED = [
     title: "Raw footage final",
     extension: "ogg",
     isStream: false,
+  },
+  {
+    what: "resolution read out of the file name",
+    url: "https://example.com/kursy/clips/wywiad_1080p.mp4",
+    title: "Wywiad 1080p",
+    extension: "mp4",
+    isStream: false,
+    resolution: "1080p",
+    resolutionSource: "address",
+  },
+  {
+    what: "a resolution printed next to the link beats the one in the address",
+    url: "https://example.com/vids/720/premiera.mp4",
+    title: "Premiera",
+    extension: "mp4",
+    isStream: false,
+    resolution: "1080p",
+    resolutionSource: "page",
   },
   {
     what: '"Ściągnij" folds to "sciagnij" and is rejected like any other generic label',
@@ -125,7 +148,11 @@ EXPECTED.forEach((expected, index) => {
     failures.push(`#${index + 1} ${expected.what}\n      missing entirely`);
     return;
   }
-  for (const key of ["url", "title", "extension", "isStream"]) {
+  const keys = ["url", "title", "extension", "isStream"];
+  for (const optional of ["resolution", "resolutionSource"]) {
+    if (optional in expected) keys.push(optional);
+  }
+  for (const key of keys) {
     check(`#${index + 1} ${expected.what} -> ${key}`, actual[key], expected[key]);
   }
 });
@@ -137,7 +164,8 @@ for (const rejected of REJECTED) {
 
 for (const result of results) {
   const label = `${result.isStream ? "stream" : "file  "} ${result.extension.padEnd(4)}`;
-  console.log(`  ${label}  ${result.title}\n          ${result.fileName} - ${result.url}`);
+  const res = result.resolution ? `${result.resolution} (${result.resolutionSource})` : "-";
+  console.log(`  ${label} ${res.padEnd(14)} ${result.title}`);
 }
 
 // A key that exists in the code but not in _locales renders as empty text in the popup,

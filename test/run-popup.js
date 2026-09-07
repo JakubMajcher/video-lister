@@ -48,6 +48,8 @@ const VIDEOS = [
     fileName: "lecture-02.mp4",
     extension: "mp4",
     isStream: false,
+    resolution: "720p",
+    resolutionSource: "player",
   },
   {
     url: "https://vod.example.com/abc/stream.mpd",
@@ -64,6 +66,8 @@ const VIDEOS = [
     fileName: "Big_Buck_Bunny_360_10s_1MB.mp4",
     extension: "mp4",
     isStream: false,
+    resolution: "360p",
+    resolutionSource: "address",
   },
   {
     url: "https://example.com/vids/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4",
@@ -169,15 +173,22 @@ const main = async () => {
     const buttons = [...row.querySelectorAll(".copy-button")];
     check(`${label} button count`, buttons.length, video.isStream ? 2 : 1);
     buttons.forEach((button, position) => {
-      checkNotEmpty(`${label} button ${position + 1} label`, button.textContent);
+      // Icon-only buttons: aria-label and the tooltip are the whole accessible name.
+      checkNotEmpty(`${label} button ${position + 1} aria-label`, button.getAttribute("aria-label"));
+      checkNotEmpty(`${label} button ${position + 1} tooltip`, button.title);
+      check(`${label} button ${position + 1} has an icon`, !!button.querySelector("svg"), true);
     });
-    check(`${label} first button label`, buttons[0]?.textContent, messages.copyLink.message);
+    check(`${label} first button label`, buttons[0]?.getAttribute("aria-label"), messages.copyLink.message);
 
     const title = row.querySelector(".result__title");
     if (video.isStream) {
       // A manifest opened in a tab downloads XML, so it must not be a link.
       check(`${label} title is not a link`, title?.tagName, "SPAN");
-      check(`${label} command button label`, buttons[1]?.textContent, messages.copyCommand.message);
+      check(
+        `${label} command button label`,
+        buttons[1]?.getAttribute("aria-label"),
+        messages.copyCommand.message,
+      );
     } else {
       check(`${label} title is a link`, title?.tagName, "A");
       check(`${label} link target`, title?.getAttribute("href"), video.url);
@@ -189,7 +200,7 @@ const main = async () => {
   // Rows 3-5 share a title and a file name; the codec badge has to separate them.
   const collidingBadges = rows.slice(2, 5).map((row) => row.querySelector(".badge").textContent);
   check("colliding rows are told apart", new Set(collidingBadges).size, collidingBadges.length);
-  check("codec badges", collidingBadges.join(" "), "MP4·AV1 MP4·H264 WEBM·VP9");
+  check("codec badges", collidingBadges.join(" "), "MP4·AV1·360p MP4·H264 WEBM·VP9");
 
   // The badge carries the container, so the file name must not repeat the extension.
   for (const [index, row] of rows.entries()) {
@@ -198,7 +209,14 @@ const main = async () => {
       failures.push(`row ${index + 1} repeats the extension already shown in the badge\n      got: ${shown}`);
     }
   }
-  check("plain row keeps a bare badge", rows[0].querySelector(".badge").textContent, "MP4");
+  check("resolution joins the badge", rows[0].querySelector(".badge").textContent, "MP4·720p");
+  check(
+    "badge tooltip names the source",
+    rows[0].querySelector(".badge").title,
+    messages.resolutionFromPlayer.message.replace("$value$", "720p"),
+  );
+  check("codec and resolution together", rows[2].querySelector(".badge").textContent, "MP4·AV1·360p");
+  check("row without resolution keeps a bare badge", rows[3].querySelector(".badge").textContent, "MP4·H264");
 
   // Rows 6-7 differ only past the "?"; the query has to reach the screen.
   const signed = rows.slice(5).map((row) => row.querySelector(".result__file").textContent);
@@ -214,7 +232,8 @@ const main = async () => {
   firstButton.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
   await new Promise((resolve) => setTimeout(resolve, 20));
   check("copied text", copied[0], VIDEOS[0].url);
-  check("button confirms the copy", firstButton.textContent, messages.copied.message);
+  check("button confirms the copy", firstButton.getAttribute("aria-label"), messages.copied.message);
+  check("confirmation is marked", firstButton.classList.contains("copy-button--copied"), true);
 
   console.log(`  popup: ${rows.length} rows rendered, every label non-empty, copy confirmed`);
 

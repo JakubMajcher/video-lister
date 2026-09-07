@@ -124,6 +124,76 @@
     return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
   };
 
+  /**
+   * Vertical resolution is the name people use: 480p, 720p, 1080p. Only the two tiers
+   * that have their own names get one, and anything unusual keeps its real height rather
+   * than being rounded into a tier it does not belong to.
+   */
+  const resolutionLabel = (height) => {
+    if (!Number.isInteger(height) || height < 120 || height > 20000) return null;
+    if (height >= 4320) return "8K";
+    if (height >= 2160) return "4K";
+    return `${height}p`;
+  };
+
+  /** Ground truth, and free: a player that has loaded knows its own dimensions. */
+  const measuredResolution = (element) => {
+    const height = element?.videoHeight;
+    return Number.isInteger(height) && height > 0 ? { height, source: "player" } : null;
+  };
+
+  const NAMED_RESOLUTIONS = new Map([
+    ["8k", 4320], ["4k", 2160], ["uhd", 2160], ["qhd", 1440], ["fullhd", 1080], ["fhd", 1080],
+  ]);
+
+  /**
+   * Read out of the address: "clip_1080p.mp4", "/vids/720/clip.mp4", "movie-4k.webm".
+   * A guess, not a measurement, so the popup says where it came from. A bare "hd" is
+   * deliberately ignored - it has meant anything from 720 to 1080 for twenty years.
+   */
+  const addressResolution = (absoluteUrl) => {
+    let path = "";
+    try {
+      path = decodeURIComponent(new URL(absoluteUrl).pathname).toLowerCase();
+    } catch {
+      return null;
+    }
+
+    const tagged = path.match(/(?:^|[^\d])(\d{3,4})p(?:[^a-z0-9]|$)/);
+    if (tagged) return { height: Number(tagged[1]), source: "address" };
+
+    for (const [name, height] of NAMED_RESOLUTIONS) {
+      if (new RegExp(`(?:^|[^a-z0-9])${name}(?:[^a-z0-9]|$)`).test(path)) {
+        return { height, source: "address" };
+      }
+    }
+    // A path segment or file-name token that is nothing but the number: /1080/, _720_.
+    const bare = path.match(/(?:^|[^\d])(240|360|480|540|576|720|1080|1440|2160|4320)(?:[^\d]|$)/);
+    return bare ? { height: Number(bare[1]), source: "address" } : null;
+  };
+
+  /** "1920 x 1080" or "1080p" written next to the link, in a table cell or a caption. */
+  const textResolution = (text) => {
+    const collapsed = collapse(text).toLowerCase();
+    if (!collapsed) return null;
+
+    const pair = collapsed.match(/(\d{3,5})\s*[x×]\s*(\d{3,5})/);
+    if (pair) return { height: Number(pair[2]), source: "page" };
+
+    const tagged = collapsed.match(/(?:^|[^\d])(\d{3,4})p(?:[^a-z0-9]|$)/);
+    return tagged ? { height: Number(tagged[1]), source: "page" } : null;
+  };
+
+  /** First source that yields a usable height wins; order decides which one that is. */
+  const pickResolution = (sources) => {
+    for (const source of sources) {
+      const found = typeof source === "function" ? source() : source;
+      const label = resolutionLabel(found?.height);
+      if (label) return { resolution: label, resolutionSource: found.source };
+    }
+    return { resolution: null, resolutionSource: null };
+  };
+
   /** og:title beats document.title - it lacks the " - CDA"-style site suffix. */
   const pageTitle = (() => {
     const meta =
@@ -193,6 +263,17 @@
     return null;
   };
 
+  /**
+   * Raw text of the nearest row-like ancestors, joined. ancestorContext deliberately
+   * rejects rows that are nothing but numbers - which is exactly where a download table
+   * prints "5 1920 x 1080", so resolution needs the unfiltered version.
+   */
+  const rowText = (element) =>
+    climb(element, 3)
+      .map((node) => collapse(node.textContent))
+      .join(" ")
+      .slice(0, 400);
+
   /** First candidate that is neither empty nor a generic action label wins. */
   const pickTitle = (candidates, absoluteUrl) => {
     for (const candidate of candidates) {
@@ -205,7 +286,11 @@
 
   const found = new Map();
 
-  const add = (rawUrl, candidates) => {
+  /**
+   * `resolutionSources` are tried before the address, so a measurement or a number
+   * printed on the page always beats a guess read out of the file name.
+   */
+  const add = (rawUrl, candidates, resolutionSources = []) => {
     const absoluteUrl = toAbsoluteUrl(rawUrl);
     if (!absoluteUrl) return;
 
@@ -220,6 +305,7 @@
       fileName: fileNameFromUrl(absoluteUrl) || absoluteUrl,
       extension,
       isStream: STREAM_EXTENSIONS.includes(extension),
+      ...pickResolution([...resolutionSources, () => addressResolution(absoluteUrl)]),
     });
   };
 
@@ -234,6 +320,9 @@
       attr(video, "data-title"),
       () => precedingHeading(video),
       () => ancestorContext(video),
+    ], [
+      () => measuredResolution(video),
+      () => textResolution(rowText(video)),
     ]);
   }
 
@@ -248,6 +337,9 @@
       attr(parent, "alt"),
       () => (parent ? precedingHeading(parent) : null),
       () => (parent ? ancestorContext(parent) : null),
+    ], [
+      () => measuredResolution(parent),
+      () => textResolution(parent ? rowText(parent) : rowText(source)),
     ]);
   }
 
@@ -262,6 +354,8 @@
       // No precedingHeading here on purpose: a download link's nearest heading is usually
       // the section title shared by the whole list, which the file name beats.
       () => ancestorContext(link),
+    ], [
+      () => textResolution(rowText(link)),
     ]);
   }
 
@@ -294,11 +388,27 @@
     const flattened = markup.replace(/\\\//g, "/").replace(/&amp;/gi, "&");
     const blobCandidates = [pageTitle];
 
+    /**
+     * Players that hide their manifest in a JSON blob usually state the dimensions right
+     * next to it: cda.pl ships "width":1920,"height":1080 in the same attribute. Only used
+     * when every pair in the document agrees, so an ad or a thumbnail cannot mislabel it.
+     */
+    const markupResolution = (() => {
+      const pairs = new Set(
+        [...flattened.matchAll(/"width"\s*:\s*"?(\d{3,5})"?\s*,\s*"height"\s*:\s*"?(\d{3,5})"?/g)]
+          .map(([, , height]) => height),
+      );
+      if (pairs.size !== 1) return null;
+      return { height: Number([...pairs][0]), source: "page" };
+    })();
+
+    const blobResolution = [() => markupResolution];
+
     for (const [match] of flattened.matchAll(ABSOLUTE_URL_PATTERN)) {
-      add(match, blobCandidates);
+      add(match, blobCandidates, blobResolution);
     }
     for (const [, path, query] of flattened.matchAll(QUOTED_RELATIVE_URL_PATTERN)) {
-      add(`${path}${query ?? ""}`, blobCandidates);
+      add(`${path}${query ?? ""}`, blobCandidates, blobResolution);
     }
   }
 

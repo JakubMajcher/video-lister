@@ -56,23 +56,64 @@ const copyToClipboard = async (text) => {
   }
 };
 
-const createCopyButton = ({ label, text, title, variant }) => {
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+/**
+ * Icons rather than labels, because "Copy link" ate 90 of the 352 pixels a row has and
+ * left the file name permanently truncated. Built through createElementNS: innerHTML is
+ * the one shortcut this add-on will not take.
+ */
+const ICON_PATHS = {
+  copy: ["M6 6h7a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1z", "M4 11H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v1"],
+  command: ["M2 3.5h12a.5.5 0 0 1 .5.5v8a.5.5 0 0 1-.5.5H2a.5.5 0 0 1-.5-.5V4a.5.5 0 0 1 .5-.5z", "M4.5 7l2 2-2 2", "M8.5 11h3"],
+  done: ["M3 8.5l3.5 3.5L13 4.5"],
+};
+
+const createIcon = (name) => {
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("viewBox", "0 0 16 16");
+  svg.setAttribute("width", "16");
+  svg.setAttribute("height", "16");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "1.5");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("stroke-linejoin", "round");
+  svg.setAttribute("aria-hidden", "true");
+
+  for (const d of ICON_PATHS[name] ?? []) {
+    const path = document.createElementNS(SVG_NS, "path");
+    path.setAttribute("d", d);
+    svg.append(path);
+  }
+  return svg;
+};
+
+const createCopyButton = ({ label, text, title, icon, variant }) => {
   const button = document.createElement("button");
   button.type = "button";
   button.className = `copy-button${variant ? ` copy-button--${variant}` : ""}`;
-  button.textContent = label;
-  if (title) button.title = title;
+  // The label lives in aria-label and the tooltip: with no text node, that is the only
+  // thing a screen reader or a hovering user has to go on.
+  button.setAttribute("aria-label", label);
+  button.title = title ?? label;
+  button.append(createIcon(icon));
 
   let resetTimer = null;
 
+  const show = (name, spokenLabel) => {
+    button.replaceChildren(createIcon(name));
+    button.setAttribute("aria-label", spokenLabel);
+  };
+
   button.addEventListener("click", async () => {
     const copied = await copyToClipboard(text);
-    button.textContent = copied ? t("copied") : t("copyFailed");
+    show(copied ? "done" : icon, copied ? t("copied") : t("copyFailed"));
     button.classList.toggle("copy-button--copied", copied);
 
     clearTimeout(resetTimer);
     resetTimer = setTimeout(() => {
-      button.textContent = label;
+      show(icon, label);
       button.classList.remove("copy-button--copied");
     }, COPIED_LABEL_MS);
   });
@@ -195,12 +236,24 @@ const withPathHints = (videos) => {
   return videos;
 };
 
-const createMeta = ({ url, fileName, pathHint, queryHint, codec, extension, isStream }) => {
+/** Says where a resolution came from, so a guess is never mistaken for a measurement. */
+const RESOLUTION_TOOLTIPS = {
+  player: (value) => t("resolutionFromPlayer", value),
+  page: (value) => t("resolutionFromPage", value),
+  address: (value) => t("resolutionFromAddress", value),
+};
+
+const createMeta = ({
+  url, fileName, pathHint, queryHint, codec, extension, isStream, resolution, resolutionSource,
+}) => {
   const badge = document.createElement("span");
   badge.className = `badge${isStream ? " badge--stream" : ""}`;
-  badge.textContent = codec
-    ? `${extension.toUpperCase()}·${codec.toUpperCase()}`
-    : extension.toUpperCase();
+  badge.textContent = [extension.toUpperCase(), codec?.toUpperCase(), resolution]
+    .filter(Boolean)
+    .join("·");
+
+  const tooltip = RESOLUTION_TOOLTIPS[resolutionSource];
+  if (resolution && tooltip) badge.title = tooltip(resolution);
 
   // The extension is already in the badge; printing it again reads as a stutter.
   const stem = fileName.replace(/\.[^.]+$/, "");
@@ -225,16 +278,14 @@ const createMeta = ({ url, fileName, pathHint, queryHint, codec, extension, isSt
   return meta;
 };
 
-const createResultRow = ({ url, title, fileName, pathHint, queryHint, codec, extension, isStream }) => {
+const createResultRow = (video) => {
+  const { url, title, isStream } = video;
   const item = document.createElement("li");
   item.className = "result";
 
   const main = document.createElement("div");
   main.className = "result__main";
-  main.append(
-    createTitle({ url, title, isStream }),
-    createMeta({ url, fileName, pathHint, queryHint, codec, extension, isStream }),
-  );
+  main.append(createTitle({ url, title, isStream }), createMeta(video));
 
   const actions = document.createElement("div");
   actions.className = "result__actions";
@@ -242,7 +293,8 @@ const createResultRow = ({ url, title, fileName, pathHint, queryHint, codec, ext
     createCopyButton({
       label: t("copyLink"),
       text: url,
-      title: isStream ? t("copyStreamLinkTooltip", url) : url,
+      title: isStream ? t("copyStreamLinkTooltip", url) : `${t("copyLink")}\n${url}`,
+      icon: "copy",
     }),
   );
   if (isStream) {
@@ -251,6 +303,7 @@ const createResultRow = ({ url, title, fileName, pathHint, queryHint, codec, ext
         label: t("copyCommand"),
         text: streamCommand(url),
         title: t("copyCommandTooltip", streamCommand(url)),
+        icon: "command",
         variant: "ghost",
       }),
     );

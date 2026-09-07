@@ -1,7 +1,7 @@
 {
   "private": true,
   "name": "video-lister",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Dev tooling for the Video Lister Firefox extension. Not part of the shipped add-on.",
   "license": "GPL-3.0-only",
   "repository": {

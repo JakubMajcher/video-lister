@@ -4,10 +4,10 @@ A Firefox extension that lists the video on the page you are looking at. Click t
 icon and you get every `.mp4`, `.webm` and `.ogg` it can find, plus any adaptive stream.
 Open one in a tab, or copy its link.
 
-<img src="docs/popup.png" width="381"
-  alt="The popup listing nine video files found on test-videos.co.uk, each row showing a
-  title, a container and codec badge such as MP4-AV1, the file name, and a Copy link
-  button">
+<img src="docs/popup.png" width="461"
+  alt="The popup listing nine files found on test-videos.co.uk, each row badged with
+  container, codec and resolution such as MP4-AV1-1080p, next to the full file name and an
+  icon button that copies the link">
 
 ## What it finds
 
@@ -25,6 +25,11 @@ surrounding table cell or the heading above the player. Failing that it cleans u
 name: `my-holiday_clip.mp4` becomes "My holiday clip".
 
 ## Streams need a second step
+
+<img src="docs/popup-stream.png" width="461"
+  alt="The popup showing three files and one DASH manifest; the manifest row is badged
+  MPD-1080p, flagged as a stream, and carries a second button that copies a yt-dlp
+  command">
 
 A manifest row is deliberately not a link, because opening a `.mpd` in a tab downloads a page
 of XML rather than a film. Copy the link into VLC or mpv and they will play it.

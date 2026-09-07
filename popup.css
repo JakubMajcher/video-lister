@@ -42,7 +42,8 @@
 }
 
 body {
-  width: 380px;
+  /* 460 rather than 380: the row has to hold a badge, a file name and two buttons. */
+  width: 460px;
   margin: 0;
   padding: 12px 14px 14px;
   background: var(--bg);
@@ -195,19 +196,21 @@ body {
 .result__actions {
   display: flex;
   flex: 0 0 auto;
-  flex-direction: column;
+  align-items: center;
   gap: 4px;
 }
 
 .copy-button {
-  padding: 5px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--bg);
-  color: var(--text);
-  font: inherit;
-  font-size: 12px;
-  white-space: nowrap;
+  color: var(--text-muted);
   cursor: pointer;
   transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease;
 }
@@ -224,8 +227,6 @@ body {
 .copy-button--ghost {
   border-color: transparent;
   background: transparent;
-  color: var(--text-muted);
-  font-size: 11px;
 }
 
 .copy-button--ghost:hover {

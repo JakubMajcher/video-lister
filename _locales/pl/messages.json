@@ -70,5 +70,32 @@
   },
   "untitledVideo": {
     "message": "Wideo bez nazwy"
+  },
+  "resolutionFromPlayer": {
+    "message": "Rozdzielczość $value$, zmierzona z playera na tej stronie",
+    "placeholders": {
+      "value": {
+        "content": "$1",
+        "example": "1080p"
+      }
+    }
+  },
+  "resolutionFromPage": {
+    "message": "Rozdzielczość $value$, wzięta ze strony",
+    "placeholders": {
+      "value": {
+        "content": "$1",
+        "example": "1080p"
+      }
+    }
+  },
+  "resolutionFromAddress": {
+    "message": "Rozdzielczość $value$, odczytana z adresu pliku, nie zmierzona",
+    "placeholders": {
+      "value": {
+        "content": "$1",
+        "example": "1080p"
+      }
+    }
   }
 }

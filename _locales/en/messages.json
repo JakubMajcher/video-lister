@@ -83,5 +83,32 @@
   "untitledVideo": {
     "message": "Untitled video",
     "description": "Fallback title for a URL whose file name cannot be read."
+  },
+  "resolutionFromPlayer": {
+    "message": "Resolution $value$, measured from the player on this page",
+    "placeholders": {
+      "value": {
+        "content": "$1",
+        "example": "1080p"
+      }
+    }
+  },
+  "resolutionFromPage": {
+    "message": "Resolution $value$, taken from the page",
+    "placeholders": {
+      "value": {
+        "content": "$1",
+        "example": "1080p"
+      }
+    }
+  },
+  "resolutionFromAddress": {
+    "message": "Resolution $value$, read from the file address rather than measured",
+    "placeholders": {
+      "value": {
+        "content": "$1",
+        "example": "1080p"
+      }
+    }
   }
 }
