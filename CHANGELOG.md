@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.2
+
+Firefox 140 or newer is now required. The declaration that this add-on collects no data
+is only understood from that version, and Mozilla's validator warned about the mismatch
+with the previous floor of 115. Firefox 140 is the current extended support release, so
+nothing that Mozilla still supports loses the add-on.
+
 ## 1.0.1
 
 Each row now says what resolution the material has: 480p, 720p, 1080p, 4K and so on,
