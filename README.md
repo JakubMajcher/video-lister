@@ -26,11 +26,6 @@ name: `my-holiday_clip.mp4` becomes "My holiday clip".
 
 ## Streams need a second step
 
-<img src="docs/popup-stream.png" width="461"
-  alt="The popup showing three files and one DASH manifest; the manifest row is badged
-  MPD-1080p, flagged as a stream, and carries a second button that copies a yt-dlp
-  command">
-
 A manifest row is deliberately not a link, because opening a `.mpd` in a tab downloads a page
 of XML rather than a film. Copy the link into VLC or mpv and they will play it.
 
